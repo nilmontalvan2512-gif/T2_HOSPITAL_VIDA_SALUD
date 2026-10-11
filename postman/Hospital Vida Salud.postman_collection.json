@@ -1,0 +1,189 @@
+{
+  "info": {
+    "name": "Hospital Vida Salud - Flujo academico",
+    "description": "Pruebas con datos ficticios para Gateway, pacientes, citas, notificaciones y validacion de pagos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "patientId", "value": "" },
+    { "key": "appointmentId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Registrar paciente ficticio",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('documentNumber', 'TEST-' + Math.random().toString(36).slice(2, 12));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Paciente creado', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('patientId', body.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{documentNumber}}\",\n  \"firstNames\": \"Ana\",\n  \"lastNames\": \"Prueba\",\n  \"birthDate\": \"1995-03-10\",\n  \"phone\": \"900000001\",\n  \"email\": \"ana@example.test\",\n  \"address\": \"Direccion ficticia\"\n}"
+        },
+        "url": "{{baseUrl}}/api/patients"
+      }
+    },
+    {
+      "name": "2. Rechazar paciente duplicado",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Documento duplicado devuelve 409', function () { pm.response.to.have.status(409); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{documentNumber}}\",\n  \"firstNames\": \"Ana\",\n  \"lastNames\": \"Prueba\",\n  \"birthDate\": \"1995-03-10\",\n  \"phone\": \"900000001\",\n  \"email\": \"ana@example.test\"\n}"
+        },
+        "url": "{{baseUrl}}/api/patients"
+      }
+    },
+    {
+      "name": "3. Consultar paciente",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Paciente consultado', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/patients/{{patientId}}"
+      }
+    },
+    {
+      "name": "4. Crear cita futura",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const future = new Date(Date.now() + 2 * 86400000);",
+              "pm.collectionVariables.set('appointmentAt', future.toISOString().slice(0, 19));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Cita creada pendiente', function () { pm.response.to.have.status(201); });",
+              "pm.collectionVariables.set('appointmentId', pm.response.json().id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"patientId\": \"{{patientId}}\",\n  \"specialty\": \"Medicina general\",\n  \"appointmentAt\": \"{{appointmentAt}}\",\n  \"professionalCode\": \"PROF-TEST-01\",\n  \"administrativeReason\": \"Control administrativo de prueba\"\n}"
+        },
+        "url": "{{baseUrl}}/api/appointments"
+      }
+    },
+    {
+      "name": "5. Confirmar cita y publicar evento",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Cita confirmada', function () { pm.response.to.have.status(200); });",
+              "pm.test('Estado confirmado', function () { pm.expect(pm.response.json().status).to.eql('CONFIRMED'); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"status\": \"CONFIRMED\" }"
+        },
+        "url": "{{baseUrl}}/api/appointments/{{appointmentId}}/status"
+      }
+    },
+    {
+      "name": "6. Verificar notificacion consumida",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Consulta de eventos disponible', function () { pm.response.to.have.status(200); });",
+              "pm.test('Evento de cita confirmado recibido', function () { pm.expect(pm.response.json().some(e => e.appointmentId === pm.collectionVariables.get('appointmentId'))).to.eql(true); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/notifications"
+      }
+    },
+    {
+      "name": "7. Rechazar pago con monto cero",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Monto cero rechazado', function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"patientId\": \"{{patientId}}\",\n  \"concept\": \"Servicio administrativo de prueba\",\n  \"amount\": 0,\n  \"paymentMethod\": \"EFECTIVO\",\n  \"operationNumber\": \"TEST-OP-ZERO\"\n}"
+        },
+        "url": "{{baseUrl}}/api/payments"
+      }
+    }
+  ]
+}

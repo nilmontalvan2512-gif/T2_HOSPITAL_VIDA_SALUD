@@ -1,0 +1,165 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hospital}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-hospital}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Define RABBITMQ_PASSWORD en .env}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  artifact-builder:
+    image: maven:3.9.9-eclipse-temurin-17
+    working_dir: /workspace
+    command:
+      - sh
+      - -c
+      - >-
+        mvn --batch-mode --no-transfer-progress verify &&
+        cp discovery-server/target/discovery-server-1.0.0.jar
+        api-gateway/target/api-gateway-1.0.0.jar
+        patient-service/target/patient-service-1.0.0.jar
+        appointment-service/target/appointment-service-1.0.0.jar
+        notification-service/target/notification-service-1.0.0.jar
+        payment-service/target/payment-service-1.0.0.jar /artifacts/
+    volumes:
+      - .:/workspace
+      - hospital-artifacts:/artifacts
+      - hospital-maven-repository:/root/.m2
+
+  discovery-server:
+    image: eclipse-temurin:17-jre
+    command: ["java", "-jar", "/artifacts/discovery-server-1.0.0.jar"]
+    volumes:
+      - hospital-artifacts:/artifacts:ro
+    ports:
+      - "${EUREKA_PORT:-8761}:8761"
+    depends_on:
+      artifact-builder:
+        condition: service_completed_successfully
+
+  api-gateway:
+    image: eclipse-temurin:17-jre
+    command: ["java", "-jar", "/artifacts/api-gateway-1.0.0.jar"]
+    volumes:
+      - hospital-artifacts:/artifacts:ro
+    environment:
+      EUREKA_HOST: discovery-server
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      - discovery-server
+
+  patient-service:
+    image: eclipse-temurin:17-jre
+    command: ["java", "-jar", "/artifacts/patient-service-1.0.0.jar"]
+    volumes:
+      - hospital-artifacts:/artifacts:ro
+    environment:
+      EUREKA_HOST: discovery-server
+      DB_HOST: postgres
+      DB_NAME: hospital_patients
+      DB_USER: ${POSTGRES_USER:-hospital}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      artifact-builder:
+        condition: service_completed_successfully
+
+  appointment-service:
+    image: eclipse-temurin:17-jre
+    command: ["java", "-jar", "/artifacts/appointment-service-1.0.0.jar"]
+    volumes:
+      - hospital-artifacts:/artifacts:ro
+    environment:
+      EUREKA_HOST: discovery-server
+      DB_HOST: postgres
+      DB_NAME: hospital_appointments
+      DB_USER: ${POSTGRES_USER:-hospital}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-hospital}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Define RABBITMQ_PASSWORD en .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      artifact-builder:
+        condition: service_completed_successfully
+
+  notification-service:
+    image: eclipse-temurin:17-jre
+    command: ["java", "-jar", "/artifacts/notification-service-1.0.0.jar"]
+    volumes:
+      - hospital-artifacts:/artifacts:ro
+    environment:
+      EUREKA_HOST: discovery-server
+      DB_HOST: postgres
+      DB_NAME: hospital_notifications
+      DB_USER: ${POSTGRES_USER:-hospital}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-hospital}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Define RABBITMQ_PASSWORD en .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      artifact-builder:
+        condition: service_completed_successfully
+
+  payment-service:
+    image: eclipse-temurin:17-jre
+    command: ["java", "-jar", "/artifacts/payment-service-1.0.0.jar"]
+    volumes:
+      - hospital-artifacts:/artifacts:ro
+    environment:
+      EUREKA_HOST: discovery-server
+      DB_HOST: postgres
+      DB_NAME: hospital_payments
+      DB_USER: ${POSTGRES_USER:-hospital}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      artifact-builder:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:
+  hospital-artifacts:
+  hospital-maven-repository:
+    name: hospital-vida-salud-m2
