@@ -176,6 +176,12 @@ Reemplaza `USUARIO/REPOSITORIO` por el remoto creado. El workflow `.github/workf
 
 Para demostrar el fallo controlado se habilitó `demo/ci-*` como rama de push. La rúbrica pide comprobar el job rojo con una aserción temporalmente fallida y, en un commit siguiente de la misma rama, corregirla y obtener un job verde. `main` no contiene el fallo. Guarda capturas reales de Actions, Eureka, RabbitMQ y las respuestas Postman para la entrega; no presentes capturas fabricadas.
 
+Ejecuciones reales generadas en el repositorio de este proyecto:
+
+- [CI verde en `main` (ejecución 2)](https://github.com/nilmontalvan2512-gif/T2_HOSPITAL_VIDA_SALUD/actions/runs/38135507723).
+- [Fallo controlado detectado (ejecución 3)](https://github.com/nilmontalvan2512-gif/T2_HOSPITAL_VIDA_SALUD/actions/runs/38135578240).
+- [Corrección aprobada en la rama de demostración (ejecución 4)](https://github.com/nilmontalvan2512-gif/T2_HOSPITAL_VIDA_SALUD/actions/runs/38135831416).
+
 ## Sustentación breve
 
 - **Límites:** Pacientes es dueño del documento y datos de contacto; Citas es dueño de agenda y estado; Pagos es dueño de operaciones simuladas; Notificaciones/Auditoría conserva los eventos recibidos.
