@@ -174,7 +174,7 @@ git push -u origin main
 
 Reemplaza `USUARIO/REPOSITORIO` por el remoto creado. El workflow `.github/workflows/ci.yml` compila y prueba todos los módulos con Java 17, sin secretos ni despliegue automático.
 
-Para demostrar un fallo controlado sin dejar código defectuoso en `main`, crea una rama temporal, provoca allí una aserción fallida, súbela y comprueba que Actions queda rojo; luego revierte solo ese cambio en la rama, vuelve a subir y captura la ejecución verde. No se deben presentar capturas fabricadas: guarda capturas reales de Actions, Eureka, RabbitMQ y las respuestas Postman cuando ejecutes la demo. Git/GitHub y la cuenta remota deben configurarse en tu equipo; no se han creado repositorio, commits ni evidencias remotas desde este proyecto.
+Para demostrar el fallo controlado se habilitó `demo/ci-*` como rama de push. La rúbrica pide comprobar el job rojo con una aserción temporalmente fallida y, en un commit siguiente de la misma rama, corregirla y obtener un job verde. `main` no contiene el fallo. Guarda capturas reales de Actions, Eureka, RabbitMQ y las respuestas Postman para la entrega; no presentes capturas fabricadas.
 
 ## Sustentación breve
 

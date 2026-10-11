@@ -2,7 +2,7 @@ name: Integracion Continua - Hospital Vida Salud
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'demo/ci-*']
   pull_request:
     branches: [main, master]
 
